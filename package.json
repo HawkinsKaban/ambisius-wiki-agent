@@ -14,7 +14,9 @@
     "test:tc3": "ts-node src/index.ts \"Perbedaan gunung agung dan gunung tambora apa?\"",
     "test:tc4": "ts-node src/index.ts \"Buatkan laporan tentang sejarah gunung agung, tambora dan sahari\"",
     "test:tc5": "ts-node src/index.ts \"Buatkan laporan tentang sejarah provinsi dimana Gunung Agung berlokasi\"",
-    "clean": "rm -rf dist",
+    "generate-results": "ts-node src/generate-results.ts",
+    "submission": "npm run generate-results",
+    "clean": "rm -rf dist hasil",
     "prepare": "npm run build"
   },
   "keywords": [

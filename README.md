@@ -14,6 +14,7 @@ Wiki Agent ini dirancang untuk memenuhi tantangan dari Ambisius Lab yang memerlu
 - ✅ **Multi-Step Analysis**: Handling query kompleks yang memerlukan inferensi
 - ✅ **Test Suite**: Comprehensive testing untuk semua test cases
 - ✅ **Error Handling**: Robust error handling dan fallback mechanisms
+- ✅ **Results Generator**: Automated test execution dengan Markdown report
 
 ## 🛠️ Tech Stack
 
@@ -53,7 +54,24 @@ Wiki Agent ini dirancang untuk memenuhi tantangan dari Ambisius Lab yang memerlu
 
 ## 🚀 Cara Penggunaan
 
-### 1. Running Individual Test Cases
+### 1. Generate Submission Results (Recommended)
+
+```bash
+# Generate complete test results dengan Markdown report
+npm run generate-results
+
+# Alternative command  
+npm run submission
+```
+
+**Output**: File Markdown lengkap di folder `hasil/` dengan timestamp yang berisi:
+- Hasil semua test cases (TC001-TC005)
+- Build verification  
+- Performance metrics
+- Code quality analysis
+- Screenshots guide untuk submission
+
+### 2. Running Individual Test Cases
 
 ```bash
 # Test Case 1 - Easy
@@ -72,19 +90,19 @@ npm run test:tc4
 npm run test:tc5
 ```
 
-### 2. Running All Test Cases
+### 3. Running All Test Cases
 
 ```bash
 npm test
 ```
 
-### 3. Custom Query
+### 4. Custom Query
 
 ```bash
 npm run dev "Your custom query here"
 ```
 
-### 4. Production Mode
+### 5. Production Mode
 
 ```bash
 npm start "Your query here"
@@ -175,7 +193,9 @@ ambisius-wiki-agent/
 │   ├── WikiAgent.ts      # Main agent class
 │   ├── index.ts          # Entry point
 │   ├── test.ts           # Test runner
+│   ├── generate-results.ts # Results generator
 │   └── types.ts          # Type definitions
+├── hasil/                # Generated test results (Markdown)
 ├── dist/                 # Built files
 ├── .env                  # Environment variables
 ├── package.json          # Dependencies
@@ -185,7 +205,7 @@ ambisius-wiki-agent/
 
 ## 🎯 Expected Results
 
-Setelah menjalankan test suite, Anda harus mendapatkan:
+Setelah menjalankan `npm run generate-results`, Anda akan mendapatkan:
 
 ```
 📈 TEST SUMMARY
@@ -195,15 +215,22 @@ Setelah menjalankan test suite, Anda harus mendapatkan:
 ❌ Failed: 0
 📈 Success Rate: 100.0%
 ⏱️ Average Response Time: 3500ms
+
+📄 Markdown report generated: hasil/ambisius-wiki-agent-results-[timestamp].md
 ```
 
 ## 📸 Screenshots untuk Submission
 
-Untuk submission challenge, ambil screenshot dari:
+**EASY SUBMISSION**: Jalankan `npm run generate-results` dan ambil screenshot dari:
 
+1. **Terminal Output**: Hasil eksekusi command
+2. **Generated Markdown File**: File di folder `hasil/` 
+3. **File Contents**: Isi lengkap dari Markdown report
+
+**Manual Screenshots** (opsional):
 1. **Test Suite Results**: Output dari `npm test`
 2. **Individual Test Cases**: Output dari setiap test case
-3. **Terminal Commands**: Bukti bahwa semua commands berhasil dijalankan
+3. **Build Verification**: Output dari `npm run build`
 
 ## 🐛 Troubleshooting
 
@@ -227,6 +254,12 @@ Untuk submission challenge, ambil screenshot dari:
    ```
    **Solution**: Agent akan otomatis mencoba strategi pencarian alternatif
 
+4. **Results Generation Failed**:
+   ```
+   ❌ Results generation failed
+   ```
+   **Solution**: Pastikan semua dependencies terinstall dan `.env` configured
+
 ### Debug Mode
 
 Untuk debugging lebih detail:
@@ -245,6 +278,7 @@ DEBUG=true npm test
 - ✅ **Modular Design**: Separation of concerns
 - ✅ **Async/Await**: Modern async programming
 - ✅ **Type Definitions**: Comprehensive type system
+- ✅ **Test Automation**: Automated results generation
 
 ### Performance Optimizations
 
@@ -252,6 +286,7 @@ DEBUG=true npm test
 - ✅ **Timeout Configuration**: Prevent hanging requests
 - ✅ **Result Caching**: Avoid duplicate fetches
 - ✅ **Strategic Fallbacks**: Multiple search strategies
+- ✅ **Parallel Execution**: Efficient test running
 
 ## 🚀 Deployment
 
@@ -260,6 +295,13 @@ DEBUG=true npm test
 ```bash
 npm run build
 npm start "Your query here"
+```
+
+### Quick Submission
+
+```bash
+# One command untuk generate semua hasil submission
+npm run generate-results
 ```
 
 ### Environment Variables
@@ -296,6 +338,26 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
+## 🎯 Quick Start untuk Submission
+
+```bash
+# 1. Clone & setup
+git clone https://github.com/HawkinsKaban/ambisius-wiki-agent.git
+cd ambisius-wiki-agent
+npm install
+
+# 2. Configure API key
+echo "GOOGLE_API_KEY=your_api_key_here" > .env
+
+# 3. Generate complete results
+npm run generate-results
+
+# 4. Take screenshots dari hasil di folder hasil/
+```
+
+---
+
 **🎯 Challenge Status**: Ready for Submission ✅  
 **📅 Deadline**: Selasa, 5 Agustus 2025  
-**🏆 Goal**: Membuktikan kemampuan Agentic AI dengan TypeScript
+**🏆 Goal**: Membuktikan kemampuan Agentic AI dengan TypeScript  
+**📋 Submission**: Run `npm run generate-results` untuk hasil lengkap
