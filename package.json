@@ -1,0 +1,37 @@
+{
+  "name": "ambisius-wiki-agent",
+  "version": "1.0.0",
+  "description": "Wiki Agent for Ambisius Lab Challenge - AI-powered information retrieval from wiki.ambisius.com",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "test": "ts-node src/test.ts",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts"
+  },
+  "keywords": [
+    "wiki",
+    "agent",
+    "ai",
+    "gemini",
+    "typescript",
+    "ambisius"
+  ],
+  "author": "Ray Hawkins Kaban",
+  "license": "MIT",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "cheerio": "^1.1.2",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  },
+    "engines": {
+    "node": ">=18.0.0"
+  }
+}
