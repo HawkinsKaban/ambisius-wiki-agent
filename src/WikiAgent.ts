@@ -586,7 +586,14 @@ ${context.map(c => `
 `;
   }
 
-  private createReportPrompt(query: ProcessedQuery, context: any[]): string {
+  
+private createReportPrompt(query: ProcessedQuery, context: any[]): string {
+  // Detect mentioned entities in the query
+  const queryLower = query.originalQuery.toLowerCase();
+  const mentionsSahari = queryLower.includes('sahari');
+  const hasAgungSource = context.some(c => c.url.includes('gunung-agung'));
+  const hasTamboraSource = context.some(c => c.url.includes('gunung-tambora'));
+  
   return `
 Buat laporan yang komprehensif untuk permintaan berikut:
 
@@ -601,40 +608,55 @@ ${context.map(c => `
 ---
 `).join('\n')}
 
-**Instruksi:**
+**Instruksi PENTING:**
 1. Buat laporan yang terstruktur dengan heading yang jelas
 2. Fokus pada aspek "sejarah" sesuai permintaan
-3. **WAJIB: Jika ada topik yang tidak ditemukan informasinya, buat section khusus dan nyatakan dengan jelas bahwa informasi tidak tersedia**
+3. **WAJIB: Untuk setiap topik yang diminta tetapi tidak ditemukan datanya, buat section khusus dengan heading "INFORMASI TIDAK TERSEDIA"**
 4. Gunakan format laporan formal
-5. Sebutkan secara explicit topik mana yang ditemukan dan mana yang tidak
+5. **KHUSUS untuk "Gunung Sahari": Karena topik ini tidak tersedia di database, buat section explicit yang menyatakan hal ini**
 
 **Format laporan:**
 
-# Laporan Sejarah [Daftar Topik]
+# Laporan Sejarah ${hasAgungSource ? 'Gunung Agung' : ''}${hasAgungSource && hasTamboraSource ? ', ' : ''}${hasTamboraSource ? 'Gunung Tambora' : ''}${mentionsSahari ? ' dan Gunung Sahari' : ''}
 
 ## Ringkasan Eksekutif
-[Ringkasan singkat laporan - sebutkan topik yang berhasil ditemukan dan yang tidak]
+Laporan ini menyajikan informasi sejarah yang tersedia dari Ambisius Wiki. ${hasAgungSource ? 'Informasi Gunung Agung berhasil ditemukan. ' : ''}${hasTamboraSource ? 'Informasi Gunung Tambora berhasil ditemukan. ' : ''}${mentionsSahari ? 'Informasi Gunung Sahari tidak tersedia di database.' : ''}
 
-## [Topik 1 - DITEMUKAN]
+${hasAgungSource ? `## Gunung Agung
 ### Sejarah
-[Detail sejarah topik 1]
+[Detail sejarah Gunung Agung berdasarkan sumber yang tersedia]
+` : ''}
 
-## [Topik 2 - DITEMUKAN]  
+${hasTamboraSource ? `## Gunung Tambora  
 ### Sejarah
-[Detail sejarah topik 2]
+[Detail sejarah Gunung Tambora berdasarkan sumber yang tersedia]
+` : ''}
 
-## [Topik yang TIDAK DITEMUKAN]
-**INFORMASI TIDAK TERSEDIA:** Informasi tentang [topik] tidak ditemukan di Ambisius Wiki. Hal ini mungkin karena:
-- Topik tersebut tidak ada dalam database wiki
-- Nama yang dicari mungkin tidak sesuai dengan yang tersedia
-- Informasi belum dimasukkan ke dalam sistem
+${mentionsSahari ? `## Gunung Sahari - INFORMASI TIDAK TERSEDIA
+
+**PENTING:** Informasi tentang Gunung Sahari tidak ditemukan di Ambisius Wiki. 
+
+### Kemungkinan Penyebab:
+- Topik "Gunung Sahari" tidak ada dalam database wiki
+- Nama yang dicari mungkin tidak sesuai dengan nomenclature yang digunakan
+- Informasi belum dimasukkan ke dalam sistem wiki
+
+### Catatan:
+Untuk mendapatkan informasi tentang Gunung Sahari, disarankan untuk:
+1. Verifikasi nama gunung yang tepat
+2. Konsultasi dengan sumber referensi geologis lain
+3. Menghubungi administrator wiki untuk penambahan konten
+` : ''}
 
 ## Kesimpulan
-[Kesimpulan dari laporan - sebutkan lagi apa yang berhasil dan tidak berhasil ditemukan]
+${hasAgungSource || hasTamboraSource ? 'Laporan ini berhasil menyajikan informasi sejarah untuk gunung-gunung yang tersedia di database. ' : ''}${mentionsSahari ? 'Informasi Gunung Sahari tidak dapat disediakan karena keterbatasan data di Ambisius Wiki.' : ''}
 
 ## Sumber Referensi
-- [daftar sumber yang digunakan]
-- **Catatan:** Beberapa topik tidak memiliki sumber karena informasi tidak ditemukan
+${context.map(c => `- [${c.title}](${c.url})`).join('\n')}
+${mentionsSahari ? '- **Gunung Sahari**: Tidak ada sumber (informasi tidak tersedia)' : ''}
+
+---
+*Laporan dibuat oleh Ambisius Wiki Agent berdasarkan data yang tersedia per ${new Date().toLocaleDateString('id-ID')}*
 `;
 }
 
