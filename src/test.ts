@@ -2,12 +2,8 @@ import * as dotenv from 'dotenv';
 import { WikiAgent } from './WikiAgent';
 import { WikiAgentConfig, AgentResponse } from './types';
 
-// Load environment variables
 dotenv.config();
 
-/**
- * Test case definition
- */
 interface TestCase {
   id: string;
   difficulty: 'Easy' | 'Medium' | 'Hard';
@@ -17,9 +13,6 @@ interface TestCase {
   expectedSources?: string[];
 }
 
-/**
- * All test cases from the challenge document
- */
 const TEST_CASES: TestCase[] = [
   {
     id: 'TC001',
@@ -84,9 +77,6 @@ const TEST_CASES: TestCase[] = [
   }
 ];
 
-/**
- * Test result interface
- */
 interface TestResult {
   testCase: TestCase;
   response: AgentResponse;
@@ -95,9 +85,6 @@ interface TestResult {
   notes: string[];
 }
 
-/**
- * Main test runner class
- */
 class WikiAgentTester {
   private agent: WikiAgent;
   private results: TestResult[] = [];
@@ -106,9 +93,6 @@ class WikiAgentTester {
     this.agent = new WikiAgent(config);
   }
 
-  /**
-   * Run all test cases
-   */
   async runAllTests(): Promise<TestResult[]> {
     console.log('🧪 Starting Wiki Agent Test Suite');
     console.log('=' + '='.repeat(50));
@@ -123,10 +107,8 @@ class WikiAgentTester {
       const result = await this.runSingleTest(testCase);
       this.results.push(result);
 
-      // Print immediate results
       this.printTestResult(result);
       
-      // Wait a bit between tests to avoid rate limiting
       if (i < TEST_CASES.length - 1) {
         console.log('\n⏳ Waiting 2 seconds before next test...');
         await this.sleep(2000);
@@ -136,9 +118,6 @@ class WikiAgentTester {
     return this.results;
   }
 
-  /**
-   * Run a single test case
-   */
   private async runSingleTest(testCase: TestCase): Promise<TestResult> {
     const startTime = Date.now();
     let response: AgentResponse;
@@ -149,7 +128,6 @@ class WikiAgentTester {
       response = await this.agent.processQuery(testCase.query);
       const executionTime = Date.now() - startTime;
 
-      // Evaluate test success based on expected behavior
       success = this.evaluateTestResult(testCase, response, notes);
 
       return {
@@ -181,19 +159,14 @@ class WikiAgentTester {
     }
   }
 
-  /**
-   * Evaluate if test result meets expected behavior
-   */
   private evaluateTestResult(testCase: TestCase, response: AgentResponse, notes: string[]): boolean {
     let success = true;
 
-    // Check basic response structure
     if (!response.query || !response.answer) {
       notes.push('❌ Invalid response structure');
       success = false;
     }
 
-    // Test case specific evaluations
     switch (testCase.id) {
       case 'TC001':
         success = this.evaluateTC001(testCase, response, notes) && success;
@@ -342,9 +315,6 @@ class WikiAgentTester {
     return success;
   }
 
-  /**
-   * Print test result to console
-   */
   private printTestResult(result: TestResult): void {
     const status = result.success ? '✅ PASSED' : '❌ FAILED';
     const time = result.executionTime;
@@ -370,9 +340,6 @@ class WikiAgentTester {
     console.log(`   ${preview}`);
   }
 
-  /**
-   * Print final test summary
-   */
   printSummary(): void {
     const totalTests = this.results.length;
     const passedTests = this.results.filter(r => r.success).length;
@@ -420,17 +387,11 @@ class WikiAgentTester {
     }
   }
 
-  /**
-   * Utility function to sleep for given milliseconds
-   */
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
 
-/**
- * Main test execution function
- */
 async function runTests() {
   const config: WikiAgentConfig = {
     apiKey: process.env.GOOGLE_API_KEY || '',
@@ -457,10 +418,8 @@ async function runTests() {
   }
 }
 
-// Export for use in other modules
 export { WikiAgentTester, TEST_CASES };
 
-// Run tests if this file is executed directly
 if (require.main === module) {
   runTests().catch(console.error);
 }

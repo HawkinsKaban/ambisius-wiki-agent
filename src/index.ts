@@ -2,12 +2,8 @@ import * as dotenv from 'dotenv';
 import { WikiAgent } from './WikiAgent';
 import { WikiAgentConfig } from './types';
 
-// Load environment variables
 dotenv.config();
 
-/**
- * Configuration for the Wiki Agent
- */
 const config: WikiAgentConfig = {
   apiKey: process.env.GOOGLE_API_KEY || '',
   baseUrl: 'https://wiki.ambisius.com',
@@ -16,9 +12,6 @@ const config: WikiAgentConfig = {
   timeout: 10000
 };
 
-/**
- * Main function to demonstrate the Wiki Agent
- */
 async function main() {
   console.log('🚀 Starting Ambisius Wiki Agent...\n');
   
@@ -28,20 +21,16 @@ async function main() {
     process.exit(1);
   }
 
-  // Initialize the Wiki Agent
   const agent = new WikiAgent(config);
   
-  // Get query from command line arguments or use default
   const query = process.argv[2] || 'Gunung Agung lokasinya ada dimana';
   
   console.log(`📝 Query: "${query}"`);
   console.log('=' + '='.repeat(query.length + 10) + '\n');
 
   try {
-    // Process the query
     const response = await agent.processQuery(query);
     
-    // Display results
     console.log('📊 RESULTS:');
     console.log('=' + '='.repeat(50));
     console.log(`🔍 Query: ${response.query}`);
@@ -68,13 +57,9 @@ async function main() {
   }
 }
 
-/**
- * Export the WikiAgent class for use in other modules
- */
 export { WikiAgent };
 export * from './types';
 
-// Run main function if this file is executed directly
 if (require.main === module) {
   main().catch(console.error);
 }

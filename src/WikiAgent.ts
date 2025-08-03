@@ -20,18 +20,13 @@ export class WikiAgent {
     this.genAI = new GoogleGenerativeAI(config.apiKey);
   }
 
-  /**
-   * Main entry point for processing user queries
-   */
   async processQuery(query: string): Promise<AgentResponse> {
     console.log(`🔍 Processing query: "${query}"`);
     
     try {
-      // Step 1: Analyze the query to understand intent and complexity
       const processedQuery = await this.analyzeQuery(query);
       console.log(`📋 Query analysis:`, processedQuery);
 
-      // Step 2: Search for relevant wiki pages
       const searchResults = await this.searchWiki(query);
       console.log(`🔎 Found ${searchResults.results.length} search results`);
 
@@ -39,17 +34,14 @@ export class WikiAgent {
         return this.createNotFoundResponse(query);
       }
 
-      // Step 3: Fetch content from relevant pages
       const pageContents = await this.fetchWikiPages(searchResults.results);
       console.log(`📄 Fetched ${pageContents.length} wiki pages`);
 
-      // Step 4: For complex queries, do additional searches if needed
       if (processedQuery.complexity === 'complex_analysis') {
         const additionalPages = await this.handleComplexAnalysis(processedQuery, pageContents);
         pageContents.push(...additionalPages);
       }
 
-      // Step 5: Generate intelligent response using Gemini
       const response = await this.generateResponse(processedQuery, pageContents);
       
       return {
@@ -67,19 +59,14 @@ export class WikiAgent {
     }
   }
 
-  /**
-   * Handle complex analysis that requires multiple search steps
-   */
   private async handleComplexAnalysis(query: ProcessedQuery, existingPages: WikiPageContent[]): Promise<WikiPageContent[]> {
     const additionalPages: WikiPageContent[] = [];
     
-    // For province questions, extract location info and search for province
     if (query.originalQuery.toLowerCase().includes('provinsi') && 
         query.originalQuery.toLowerCase().includes('gunung agung')) {
       
       console.log('🔍 Complex analysis: Finding province of Gunung Agung');
       
-      // Look for Bali in existing content
       const agungPage = existingPages.find(page => 
         page.url.includes('gunung-agung') || page.title.toLowerCase().includes('agung')
       );
@@ -87,14 +74,12 @@ export class WikiAgent {
       if (agungPage && agungPage.content.toLowerCase().includes('bali')) {
         console.log('🏝️ Found Bali mentioned, searching for Bali province info');
         
-        // Search for Bali province information
         const baliSearch = await this.searchWiki('provinsi bali');
         if (baliSearch.results.length > 0) {
           const baliPages = await this.fetchWikiPages(baliSearch.results);
           additionalPages.push(...baliPages);
         }
         
-        // Also try direct URL
         try {
           const baliPage = await this.fetchSinglePage('https://wiki.ambisius.com/provinsi/bali');
           if (baliPage) {
@@ -109,9 +94,6 @@ export class WikiAgent {
     return additionalPages;
   }
 
-  /**
-   * Analyze user query to understand intent and complexity
-   */
   private async analyzeQuery(query: string): Promise<ProcessedQuery> {
     const model = this.genAI.getGenerativeModel({ 
       model: 'gemini-2.0-flash-exp' 
@@ -142,13 +124,11 @@ Guidelines:
       const result = await model.generateContent(prompt);
       const response = result.response.text().trim();
       
-      // Extract JSON from response
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0]);
       }
       
-      // Fallback analysis
       return this.fallbackQueryAnalysis(query);
     } catch (error) {
       console.warn('⚠️ Failed to analyze query with AI, using fallback');
@@ -156,9 +136,6 @@ Guidelines:
     }
   }
 
-  /**
-   * Improved fallback query analysis
-   */
   private fallbackQueryAnalysis(query: string): ProcessedQuery {
     const lowerQuery = query.toLowerCase();
     
@@ -177,7 +154,6 @@ Guidelines:
       requiresMultiplePages = true;
     }
 
-    // Extract potential entities (improved)
     const entities = [];
     const knownEntities = [
       'gunung agung', 'gunung tambora', 'gunung sahari', 'bali', 
@@ -199,21 +175,15 @@ Guidelines:
     };
   }
 
-  /**
-   * Improved search function with multiple strategies
-   */
   private async searchWiki(query: string): Promise<SearchToolResponse> {
     console.log(`🌐 Searching: ${query}`);
     
-    // Strategy 1: Use the search endpoint
     let results = await this.searchViaEndpoint(query);
     
-    // Strategy 2: If no results, try direct URL guessing
     if (results.results.length === 0) {
       results = await this.searchViaDirectUrls(query);
     }
     
-    // Strategy 3: Try variations of the query
     if (results.results.length === 0) {
       results = await this.searchWithVariations(query);
     }
@@ -221,9 +191,6 @@ Guidelines:
     return results;
   }
 
-  /**
-   * Search using the provided search endpoint
-   */
   private async searchViaEndpoint(query: string): Promise<SearchToolResponse> {
     const searchUrl = `${this.config.searchEndpoint}${encodeURIComponent(query)}`;
     
@@ -248,14 +215,10 @@ Guidelines:
     }
   }
 
-  /**
-   * Try to guess direct URLs based on query content
-   */
   private async searchViaDirectUrls(query: string): Promise<SearchToolResponse> {
     const results: WikiSearchResult[] = [];
     const lowerQuery = query.toLowerCase();
     
-    // Direct URL patterns based on known structure
     const urlMappings = [
       { keywords: ['gunung agung', 'agung'], url: 'https://wiki.ambisius.com/gunung/gunung-agung' },
       { keywords: ['gunung tambora', 'tambora'], url: 'https://wiki.ambisius.com/gunung/gunung-tambora' },
@@ -286,9 +249,6 @@ Guidelines:
     return { results, totalResults: results.length };
   }
 
-  /**
-   * Try different variations of the search query
-   */
   private async searchWithVariations(query: string): Promise<SearchToolResponse> {
     const variations = [
       query.replace(/\s+/g, '+'),
@@ -309,14 +269,10 @@ Guidelines:
     return { results: [], totalResults: 0 };
   }
 
-  /**
-   * Improved search results parsing
-   */
   private parseSearchResults(html: string): SearchToolResponse {
     const $ = cheerio.load(html);
     const results: WikiSearchResult[] = [];
 
-    // Multiple selectors to find search results
     const selectors = [
       'a[href*="/gunung/"]',
       'a[href*="/provinsi/"]', 
@@ -336,7 +292,6 @@ Guidelines:
         if (href && text && href.includes('wiki.ambisius.com')) {
           const url = href.startsWith('http') ? href : `https://wiki.ambisius.com${href}`;
           
-          // Avoid duplicates
           if (!results.some(r => r.url === url)) {
             results.push({
               title: text,
@@ -347,7 +302,7 @@ Guidelines:
         }
       });
       
-      if (results.length > 0) break; // Stop at first successful selector
+      if (results.length > 0) break;
     }
 
     console.log(`✅ Parsed ${results.length} search results`);
@@ -357,9 +312,6 @@ Guidelines:
     };
   }
 
-  /**
-   * Fetch content from wiki pages
-   */
   private async fetchWikiPages(searchResults: WikiSearchResult[]): Promise<WikiPageContent[]> {
     const contents: WikiPageContent[] = [];
     
@@ -378,9 +330,6 @@ Guidelines:
     return contents;
   }
 
-  /**
-   * Improved single page fetching
-   */
   private async fetchSinglePage(url: string): Promise<WikiPageContent | null> {
     try {
       const response = await fetch(url, {
@@ -398,15 +347,12 @@ Guidelines:
       const html = await response.text();
       const $ = cheerio.load(html);
 
-      // Remove unwanted elements
       $('script, style, nav, footer, .sidebar').remove();
 
-      // Extract title with fallbacks
       const title = $('h1').first().text().trim() || 
                    $('title').text().trim().split(' - ')[0] || 
                    'Untitled';
 
-      // Extract main content with improved selectors
       const contentSelectors = [
         'main .content',
         '.main-content', 
@@ -427,20 +373,17 @@ Guidelines:
         }
       }
 
-      // If still no content, try body
       if (!mainContent || mainContent.length < 100) {
         $('header, nav, footer, .navigation, .menu').remove();
         mainContent = $('body').text().trim();
       }
 
-      // Extract sections with better structure
       const sections: Record<string, string> = {};
       $('h1, h2, h3, h4, h5, h6').each((i, element) => {
         const $heading = $(element);
         const sectionTitle = $heading.text().trim();
         
         if (sectionTitle) {
-          // Get content until next heading of same or higher level
           const tagName = (element as any).tagName || (element as any).name || 'h1';
           const headingLevel = parseInt(tagName.charAt(1));
           const nextHeadingSelector = Array.from({length: headingLevel}, (_, i) => `h${i + 1}`).join(', ');
@@ -455,7 +398,7 @@ Guidelines:
       return {
         url,
         title,
-        content: mainContent.slice(0, 8000), // Increased limit
+        content: mainContent.slice(0, 8000),
         sections
       };
     } catch (error) {
@@ -464,14 +407,11 @@ Guidelines:
     }
   }
 
-  /**
-   * Generate intelligent response using Gemini with improved prompts
-   */
   private async generateResponse(processedQuery: ProcessedQuery, pageContents: WikiPageContent[]): Promise<string> {
     const model = this.genAI.getGenerativeModel({ 
       model: 'gemini-2.0-flash-exp',
       generationConfig: {
-        temperature: 0.1, // Lower temperature for more consistent responses
+        temperature: 0.1,
         topP: 0.8,
         topK: 40,
         maxOutputTokens: 8192,
@@ -481,7 +421,7 @@ Guidelines:
     const contextData = pageContents.map(page => ({
       url: page.url,
       title: page.title,
-      content: page.content.slice(0, 3000) // Increased context per page
+      content: page.content.slice(0, 3000)
     }));
 
     let prompt = '';
@@ -588,7 +528,6 @@ ${context.map(c => `
 
   
 private createReportPrompt(query: ProcessedQuery, context: any[]): string {
-  // Detect mentioned entities in the query
   const queryLower = query.originalQuery.toLowerCase();
   const mentionsSahari = queryLower.includes('sahari');
   const hasAgungSource = context.some(c => c.url.includes('gunung-agung'));
