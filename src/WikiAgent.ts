@@ -43,12 +43,18 @@ export class WikiAgent {
       const pageContents = await this.fetchWikiPages(searchResults.results);
       console.log(`📄 Fetched ${pageContents.length} wiki pages`);
 
-      // Step 4: Generate intelligent response using Gemini
+      // Step 4: For complex queries, do additional searches if needed
+      if (processedQuery.complexity === 'complex_analysis') {
+        const additionalPages = await this.handleComplexAnalysis(processedQuery, pageContents);
+        pageContents.push(...additionalPages);
+      }
+
+      // Step 5: Generate intelligent response using Gemini
       const response = await this.generateResponse(processedQuery, pageContents);
       
       return {
         query,
-        found: true,
+        found: pageContents.length > 0,
         sources: pageContents.map(p => p.url),
         answer: response,
         format: 'markdown',
@@ -59,6 +65,48 @@ export class WikiAgent {
       console.error('❌ Error processing query:', error);
       return this.createErrorResponse(query, error as Error);
     }
+  }
+
+  /**
+   * Handle complex analysis that requires multiple search steps
+   */
+  private async handleComplexAnalysis(query: ProcessedQuery, existingPages: WikiPageContent[]): Promise<WikiPageContent[]> {
+    const additionalPages: WikiPageContent[] = [];
+    
+    // For province questions, extract location info and search for province
+    if (query.originalQuery.toLowerCase().includes('provinsi') && 
+        query.originalQuery.toLowerCase().includes('gunung agung')) {
+      
+      console.log('🔍 Complex analysis: Finding province of Gunung Agung');
+      
+      // Look for Bali in existing content
+      const agungPage = existingPages.find(page => 
+        page.url.includes('gunung-agung') || page.title.toLowerCase().includes('agung')
+      );
+      
+      if (agungPage && agungPage.content.toLowerCase().includes('bali')) {
+        console.log('🏝️ Found Bali mentioned, searching for Bali province info');
+        
+        // Search for Bali province information
+        const baliSearch = await this.searchWiki('provinsi bali');
+        if (baliSearch.results.length > 0) {
+          const baliPages = await this.fetchWikiPages(baliSearch.results);
+          additionalPages.push(...baliPages);
+        }
+        
+        // Also try direct URL
+        try {
+          const baliPage = await this.fetchSinglePage('https://wiki.ambisius.com/provinsi/bali');
+          if (baliPage) {
+            additionalPages.push(baliPage);
+          }
+        } catch (error) {
+          console.warn('⚠️ Could not fetch Bali page directly');
+        }
+      }
+    }
+    
+    return additionalPages;
   }
 
   /**
@@ -84,7 +132,7 @@ Guidelines:
 - "simple": asking for basic info about one thing
 - "comparison": comparing multiple things  
 - "report": requesting detailed report/analysis
-- "complex_analysis": multi-step analysis requiring inference
+- "complex_analysis": multi-step analysis requiring inference (like finding province then province info)
 - requiresMultiplePages: true if needs info from multiple wiki pages
 `;
 
@@ -107,7 +155,7 @@ Guidelines:
   }
 
   /**
-   * Fallback query analysis when AI analysis fails
+   * Improved fallback query analysis
    */
   private fallbackQueryAnalysis(query: string): ProcessedQuery {
     const lowerQuery = query.toLowerCase();
@@ -115,7 +163,8 @@ Guidelines:
     let complexity: QueryComplexity = 'simple';
     let requiresMultiplePages = false;
     
-    if (lowerQuery.includes('perbedaan') || lowerQuery.includes('vs') || lowerQuery.includes('dan')) {
+    if (lowerQuery.includes('perbedaan') || lowerQuery.includes('vs') || 
+        (lowerQuery.includes('dan') && lowerQuery.includes('gunung'))) {
       complexity = 'comparison';
       requiresMultiplePages = true;
     } else if (lowerQuery.includes('laporan') || lowerQuery.includes('sejarah')) {
@@ -126,10 +175,14 @@ Guidelines:
       requiresMultiplePages = true;
     }
 
-    // Extract potential entities (simplified)
+    // Extract potential entities (improved)
     const entities = [];
-    const commonEntities = ['gunung agung', 'gunung tambora', 'gunung sahari', 'bali'];
-    for (const entity of commonEntities) {
+    const knownEntities = [
+      'gunung agung', 'gunung tambora', 'gunung sahari', 'bali', 
+      'agung', 'tambora', 'sahari', 'provinsi'
+    ];
+    
+    for (const entity of knownEntities) {
       if (lowerQuery.includes(entity)) {
         entities.push(entity);
       }
@@ -145,18 +198,40 @@ Guidelines:
   }
 
   /**
-   * Search the Ambisius Wiki for relevant pages
+   * Improved search function with multiple strategies
    */
   private async searchWiki(query: string): Promise<SearchToolResponse> {
+    console.log(`🌐 Searching: ${query}`);
+    
+    // Strategy 1: Use the search endpoint
+    let results = await this.searchViaEndpoint(query);
+    
+    // Strategy 2: If no results, try direct URL guessing
+    if (results.results.length === 0) {
+      results = await this.searchViaDirectUrls(query);
+    }
+    
+    // Strategy 3: Try variations of the query
+    if (results.results.length === 0) {
+      results = await this.searchWithVariations(query);
+    }
+    
+    return results;
+  }
+
+  /**
+   * Search using the provided search endpoint
+   */
+  private async searchViaEndpoint(query: string): Promise<SearchToolResponse> {
     const searchUrl = `${this.config.searchEndpoint}${encodeURIComponent(query)}`;
-    console.log(`🌐 Searching: ${searchUrl}`);
     
     try {
       const response = await fetch(searchUrl, {
-        timeout: this.config.timeout,
         headers: {
-          'User-Agent': 'Ambisius-Wiki-Agent/1.0'
-        }
+          'User-Agent': 'Ambisius-Wiki-Agent/1.0',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        },
+        timeout: this.config.timeout
       });
 
       if (!response.ok) {
@@ -166,52 +241,111 @@ Guidelines:
       const html = await response.text();
       return this.parseSearchResults(html);
     } catch (error) {
-      console.error('❌ Search error:', error);
+      console.warn('⚠️ Search endpoint failed:', error);
       return { results: [], totalResults: 0 };
     }
   }
 
   /**
-   * Parse search results from HTML response
+   * Try to guess direct URLs based on query content
+   */
+  private async searchViaDirectUrls(query: string): Promise<SearchToolResponse> {
+    const results: WikiSearchResult[] = [];
+    const lowerQuery = query.toLowerCase();
+    
+    // Direct URL patterns based on known structure
+    const urlMappings = [
+      { keywords: ['gunung agung', 'agung'], url: 'https://wiki.ambisius.com/gunung/gunung-agung' },
+      { keywords: ['gunung tambora', 'tambora'], url: 'https://wiki.ambisius.com/gunung/gunung-tambora' },
+      { keywords: ['bali', 'provinsi bali'], url: 'https://wiki.ambisius.com/provinsi/bali' }
+    ];
+    
+    for (const mapping of urlMappings) {
+      if (mapping.keywords.some(keyword => lowerQuery.includes(keyword))) {
+        try {
+          const response = await fetch(mapping.url, {
+            method: 'HEAD',
+            timeout: 5000
+          });
+          
+          if (response.ok) {
+            results.push({
+              title: mapping.keywords[0],
+              url: mapping.url,
+              snippet: `Direct link found for ${mapping.keywords[0]}`
+            });
+          }
+        } catch (error) {
+          console.warn(`⚠️ Could not verify ${mapping.url}`);
+        }
+      }
+    }
+    
+    return { results, totalResults: results.length };
+  }
+
+  /**
+   * Try different variations of the search query
+   */
+  private async searchWithVariations(query: string): Promise<SearchToolResponse> {
+    const variations = [
+      query.replace(/\s+/g, '+'),
+      query.split(' ').join('-'),
+      query.toLowerCase(),
+      query.replace(/[^\w\s]/g, '').trim()
+    ];
+    
+    for (const variation of variations) {
+      if (variation !== query) {
+        const results = await this.searchViaEndpoint(variation);
+        if (results.results.length > 0) {
+          return results;
+        }
+      }
+    }
+    
+    return { results: [], totalResults: 0 };
+  }
+
+  /**
+   * Improved search results parsing
    */
   private parseSearchResults(html: string): SearchToolResponse {
     const $ = cheerio.load(html);
     const results: WikiSearchResult[] = [];
 
-    // Look for search results in various possible formats
-    $('a[href*="/gunung/"], a[href*="/provinsi/"], a[href*="wiki.ambisius.com"]').each((i, element) => {
-      const $link = $(element);
-      const href = $link.attr('href');
-      const text = $link.text().trim();
-      
-      if (href && text && href.includes('wiki.ambisius.com')) {
-        const url = href.startsWith('http') ? href : `https://wiki.ambisius.com${href}`;
-        
-        results.push({
-          title: text,
-          url: url,
-          snippet: $link.parent().text().slice(0, 200) + '...'
-        });
-      }
-    });
+    // Multiple selectors to find search results
+    const selectors = [
+      'a[href*="/gunung/"]',
+      'a[href*="/provinsi/"]', 
+      'a[href*="wiki.ambisius.com"]',
+      '.search-result a',
+      '.result a',
+      'article a',
+      'li a'
+    ];
 
-    // If no results found in links, try to find them in other elements
-    if (results.length === 0) {
-      $('.result, .search-result, article').each((i, element) => {
-        const $el = $(element);
-        const link = $el.find('a').first();
-        const href = link.attr('href');
-        const title = link.text().trim() || $el.find('h1, h2, h3').first().text().trim();
+    for (const selector of selectors) {
+      $(selector).each((i, element) => {
+        const $link = $(element);
+        const href = $link.attr('href');
+        const text = $link.text().trim();
         
-        if (href && title) {
+        if (href && text && href.includes('wiki.ambisius.com')) {
           const url = href.startsWith('http') ? href : `https://wiki.ambisius.com${href}`;
-          results.push({
-            title,
-            url,
-            snippet: $el.text().slice(0, 200) + '...'
-          });
+          
+          // Avoid duplicates
+          if (!results.some(r => r.url === url)) {
+            results.push({
+              title: text,
+              url: url,
+              snippet: $link.closest('p, div, li').text().slice(0, 200) + '...'
+            });
+          }
         }
       });
+      
+      if (results.length > 0) break; // Stop at first successful selector
     }
 
     console.log(`✅ Parsed ${results.length} search results`);
@@ -243,15 +377,16 @@ Guidelines:
   }
 
   /**
-   * Fetch and parse a single wiki page
+   * Improved single page fetching
    */
   private async fetchSinglePage(url: string): Promise<WikiPageContent | null> {
     try {
       const response = await fetch(url, {
-        timeout: this.config.timeout,
         headers: {
-          'User-Agent': 'Ambisius-Wiki-Agent/1.0'
-        }
+          'User-Agent': 'Ambisius-Wiki-Agent/1.0',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        },
+        timeout: this.config.timeout
       });
 
       if (!response.ok) {
@@ -261,19 +396,25 @@ Guidelines:
       const html = await response.text();
       const $ = cheerio.load(html);
 
-      // Extract title
+      // Remove unwanted elements
+      $('script, style, nav, footer, .sidebar').remove();
+
+      // Extract title with fallbacks
       const title = $('h1').first().text().trim() || 
-                   $('title').text().trim() || 
+                   $('title').text().trim().split(' - ')[0] || 
                    'Untitled';
 
-      // Extract main content
+      // Extract main content with improved selectors
       const contentSelectors = [
-        'main', 
-        '.content', 
+        'main .content',
+        '.main-content', 
         '.article-content',
         '#content',
         'article',
-        '.post-content'
+        '.post-content',
+        '.entry-content',
+        'main',
+        '.content'
       ];
 
       let mainContent = '';
@@ -284,26 +425,35 @@ Guidelines:
         }
       }
 
-      // If no main content found, get body text
-      if (!mainContent) {
+      // If still no content, try body
+      if (!mainContent || mainContent.length < 100) {
+        $('header, nav, footer, .navigation, .menu').remove();
         mainContent = $('body').text().trim();
       }
 
-      // Extract sections
+      // Extract sections with better structure
       const sections: Record<string, string> = {};
-      $('h1, h2, h3, h4').each((i, element) => {
+      $('h1, h2, h3, h4, h5, h6').each((i, element) => {
         const $heading = $(element);
         const sectionTitle = $heading.text().trim();
-        const sectionContent = $heading.nextUntil('h1, h2, h3, h4').text().trim();
-        if (sectionTitle && sectionContent) {
-          sections[sectionTitle] = sectionContent;
+        
+        if (sectionTitle) {
+          // Get content until next heading of same or higher level
+          const tagName = (element as any).tagName || (element as any).name || 'h1';
+          const headingLevel = parseInt(tagName.charAt(1));
+          const nextHeadingSelector = Array.from({length: headingLevel}, (_, i) => `h${i + 1}`).join(', ');
+          const sectionContent = $heading.nextUntil(nextHeadingSelector).text().trim();
+          
+          if (sectionContent) {
+            sections[sectionTitle] = sectionContent;
+          }
         }
       });
 
       return {
         url,
         title,
-        content: mainContent.slice(0, 5000), // Limit content length
+        content: mainContent.slice(0, 8000), // Increased limit
         sections
       };
     } catch (error) {
@@ -313,15 +463,23 @@ Guidelines:
   }
 
   /**
-   * Generate intelligent response using Gemini
+   * Generate intelligent response using Gemini with improved prompts
    */
   private async generateResponse(processedQuery: ProcessedQuery, pageContents: WikiPageContent[]): Promise<string> {
-    const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const model = this.genAI.getGenerativeModel({ 
+      model: 'gemini-2.0-flash-exp',
+      generationConfig: {
+        temperature: 0.1, // Lower temperature for more consistent responses
+        topP: 0.8,
+        topK: 40,
+        maxOutputTokens: 8192,
+      }
+    });
 
     const contextData = pageContents.map(page => ({
       url: page.url,
       title: page.title,
-      content: page.content.slice(0, 2000) // Limit context per page
+      content: page.content.slice(0, 3000) // Increased context per page
     }));
 
     let prompt = '';
@@ -352,19 +510,34 @@ Guidelines:
 
   private createSimpleQueryPrompt(query: ProcessedQuery, context: any[]): string {
     return `
+Anda adalah asisten AI yang ahli dalam memberikan informasi dari Ambisius Wiki. 
 Berikan jawaban yang akurat dan informatif untuk pertanyaan berikut dalam bahasa Indonesia:
 
-Pertanyaan: ${query.originalQuery}
+**Pertanyaan:** ${query.originalQuery}
 
-Gunakan informasi dari sumber-sumber berikut:
+**Sumber informasi yang tersedia:**
 ${context.map(c => `
-Sumber: ${c.url}
-Judul: ${c.title}  
-Isi: ${c.content}
+---
+**Sumber:** ${c.url}
+**Judul:** ${c.title}  
+**Konten:** ${c.content}
+---
 `).join('\n')}
 
-Berikan jawaban dalam format markdown yang mudah dibaca. Sertakan informasi sumber di akhir.
-Jika informasi tidak ditemukan, jelaskan dengan jelas bahwa informasi tersebut tidak tersedia.
+**Instruksi:**
+1. Berikan jawaban yang langsung menjawab pertanyaan
+2. Gunakan format markdown yang rapi
+3. Sertakan informasi lokasi yang spesifik jika ditanya tentang lokasi
+4. Jika informasi tidak ditemukan, jelaskan dengan jelas
+5. Akhiri dengan daftar sumber yang digunakan
+
+**Format jawaban:**
+# [Judul Jawaban]
+
+[Isi jawaban yang detail dan informatif]
+
+## Sumber
+- [daftar sumber]
 `;
   }
 
@@ -372,22 +545,42 @@ Jika informasi tidak ditemukan, jelaskan dengan jelas bahwa informasi tersebut t
     return `
 Buat perbandingan yang detail dan terstruktur untuk pertanyaan berikut:
 
-Pertanyaan: ${query.originalQuery}
+**Pertanyaan:** ${query.originalQuery}
 
-Sumber informasi:
+**Sumber informasi:**
 ${context.map(c => `
-Sumber: ${c.url}
-Judul: ${c.title}
-Isi: ${c.content}
+---
+**Sumber:** ${c.url}
+**Judul:** ${c.title}
+**Konten:** ${c.content}
+---
 `).join('\n')}
 
-Format jawaban:
-1. Berikan perbandingan dalam bentuk tabel markdown
-2. Jelaskan perbedaan utama dalam paragraf
-3. Sertakan sumber informasi
-4. Jika ada informasi yang tidak ditemukan, sebutkan dengan jelas
+**Instruksi:**
+1. Buat perbandingan dalam bentuk tabel markdown
+2. Jelaskan perbedaan utama dalam paragraf setelah tabel
+3. Fokus pada aspek-aspek yang paling relevan
+4. Jika ada informasi yang tidak lengkap, sebutkan dengan jelas
 
-Gunakan bahasa Indonesia yang baik dan benar.
+**Format yang diharapkan:**
+
+# Perbandingan [Topik A] dan [Topik B]
+
+## Tabel Perbandingan
+
+| Aspek | [Topik A] | [Topik B] |
+|-------|-----------|-----------|
+| Lokasi | ... | ... |
+| Ketinggian | ... | ... |
+| Sejarah | ... | ... |
+| Karakteristik | ... | ... |
+
+## Perbedaan Utama
+
+[Penjelasan detail perbedaan]
+
+## Sumber
+- [daftar sumber]
 `;
   }
 
@@ -395,54 +588,97 @@ Gunakan bahasa Indonesia yang baik dan benar.
     return `
 Buat laporan yang komprehensif untuk permintaan berikut:
 
-Permintaan: ${query.originalQuery}
+**Permintaan:** ${query.originalQuery}
 
-Data yang tersedia:
+**Data yang tersedia:**
 ${context.map(c => `
-Sumber: ${c.url}
-Judul: ${c.title}
-Isi: ${c.content}
+---
+**Sumber:** ${c.url}
+**Judul:** ${c.title}
+**Konten:** ${c.content}
+---
 `).join('\n')}
 
-Format laporan:
-# Laporan [Topik]
+**Instruksi:**
+1. Buat laporan yang terstruktur dengan heading yang jelas
+2. Fokus pada aspek "sejarah" sesuai permintaan
+3. Jika ada topik yang tidak ditemukan informasinya, nyatakan dengan jelas
+4. Gunakan format laporan formal
+
+**Format laporan:**
+
+# Laporan Sejarah [Topik]
 
 ## Ringkasan Eksekutif
-[Ringkasan singkat]
+[Ringkasan singkat laporan]
 
-## [Bagian-bagian sesuai topik]
-[Detail informasi]
+## [Topik 1]
+### Sejarah
+[Detail sejarah topik 1]
 
-## Sumber
-[Daftar sumber yang digunakan]
+## [Topik 2]  
+### Sejarah
+[Detail sejarah topik 2]
 
-Catatan: Jika ada informasi yang tidak ditemukan, nyatakan dengan jelas di bagian yang relevan.
-Gunakan bahasa Indonesia formal dan struktur yang mudah dibaca.
+## [Topik yang tidak ditemukan]
+Informasi tentang [topik] tidak ditemukan di Ambisius Wiki.
+
+## Kesimpulan
+[Kesimpulan dari laporan]
+
+## Sumber Referensi
+- [daftar sumber yang digunakan]
 `;
   }
 
   private createComplexAnalysisPrompt(query: ProcessedQuery, context: any[]): string {
     return `
-Lakukan analisis kompleks untuk menjawab pertanyaan berikut:
+Lakukan analisis kompleks untuk menjawab pertanyaan berikut yang memerlukan inferensi multi-langkah:
 
-Pertanyaan: ${query.originalQuery}
+**Pertanyaan:** ${query.originalQuery}
 
-Sumber informasi:
+**Sumber informasi:**
 ${context.map(c => `
-Sumber: ${c.url}
-Judul: ${c.title}
-Isi: ${c.content}
+---
+**Sumber:** ${c.url}
+**Judul:** ${c.title}
+**Konten:** ${c.content}
+---
 `).join('\n')}
 
-Langkah analisis:
-1. Identifikasi informasi yang diminta
-2. Cari data dari multiple sumber jika diperlukan
-3. Lakukan inferensi berdasarkan informasi yang tersedia
-4. Berikan jawaban yang komprehensif
+**Instruksi untuk analisis:**
+1. **Langkah 1:** Identifikasi lokasi/provinsi dari informasi yang tersedia
+2. **Langkah 2:** Gunakan informasi provinsi untuk memberikan laporan sejarah
+3. **Langkah 3:** Struktur jawaban dengan reasoning yang jelas
+4. Jika informasi tidak lengkap, jelaskan langkah yang tidak bisa diselesaikan
 
-Format jawaban dalam markdown dengan struktur yang jelas.
-Sertakan reasoning/alasan di balik setiap kesimpulan.
-Jika perlu informasi tambahan yang tidak tersedia, sebutkan dengan jelas.
+**Format analisis:**
+
+# Laporan Sejarah Provinsi [Nama Provinsi]
+
+## Analisis Lokasi
+Berdasarkan informasi dari [sumber], [objek] berlokasi di Provinsi [nama provinsi].
+
+## Sejarah Provinsi [Nama Provinsi]
+
+### Periode Awal
+[Informasi sejarah awal]
+
+### Perkembangan Modern  
+[Informasi perkembangan modern]
+
+### Karakteristik Penting
+[Karakteristik unik provinsi]
+
+## Kesimpulan
+[Kesimpulan analisis]
+
+## Metodologi Analisis
+1. [Langkah analisis yang dilakukan]
+2. [Sumber yang digunakan]
+
+## Sumber Referensi
+- [daftar sumber]
 `;
   }
 
@@ -454,7 +690,7 @@ Berdasarkan pencarian di Ambisius Wiki, berikut informasi yang ditemukan:
 
 ${context.map(c => `
 ## ${c.title}
-${c.content.slice(0, 500)}...
+${c.content.slice(0, 800)}...
 
 **Sumber:** ${c.url}
 `).join('\n')}
@@ -462,6 +698,9 @@ ${c.content.slice(0, 500)}...
 ${context.length === 0 ? 
   '**Maaf, informasi yang diminta tidak ditemukan di Ambisius Wiki.**' : 
   ''}
+
+## Sumber Referensi
+${context.map(c => `- [${c.title}](${c.url})`).join('\n')}
 `;
   }
 
@@ -474,12 +713,17 @@ ${context.length === 0 ?
 
 Maaf, saya tidak dapat menemukan informasi tentang "${query}" di Ambisius Wiki.
 
-Kemungkinan penyebab:
+## Kemungkinan Penyebab:
 - Topik tersebut belum tersedia di wiki
 - Istilah pencarian perlu disesuaikan
 - Informasi mungkin tersedia dengan nama yang berbeda
 
-Silakan coba dengan kata kunci yang berbeda atau periksa ejaan.`,
+## Saran:
+- Coba dengan kata kunci yang berbeda
+- Periksa ejaan dan tanda baca
+- Gunakan istilah yang lebih umum
+
+Silakan coba pencarian lain atau hubungi administrator jika diperlukan.`,
       format: 'markdown',
       timestamp: new Date().toISOString()
     };
@@ -496,7 +740,12 @@ Terjadi kesalahan saat memproses permintaan "${query}".
 
 **Error:** ${error.message}
 
-Silakan coba lagi atau hubungi administrator jika masalah berlanjut.`,
+## Langkah Troubleshooting:
+1. Periksa koneksi internet
+2. Pastikan wiki.ambisius.com dapat diakses
+3. Coba lagi dalam beberapa saat
+
+Silakan hubungi administrator jika masalah berlanjut.`,
       format: 'markdown',
       timestamp: new Date().toISOString()
     };

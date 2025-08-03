@@ -9,18 +9,26 @@
     "dev": "ts-node src/index.ts",
     "test": "ts-node src/test.ts",
     "test:single": "ts-node src/index.ts",
+    "test:tc1": "ts-node src/index.ts \"Gunung Agung lokasinya ada dimana\"",
+    "test:tc2": "ts-node src/index.ts \"Gunung Sahari lokasi nya dimana?\"", 
+    "test:tc3": "ts-node src/index.ts \"Perbedaan gunung agung dan gunung tambora apa?\"",
+    "test:tc4": "ts-node src/index.ts \"Buatkan laporan tentang sejarah gunung agung, tambora dan sahari\"",
+    "test:tc5": "ts-node src/index.ts \"Buatkan laporan tentang sejarah provinsi dimana Gunung Agung berlokasi\"",
     "clean": "rm -rf dist",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "lint": "echo 'Linting not configured yet'",
+    "format": "echo 'Formatting not configured yet'"
   },
   "keywords": [
     "wiki",
-    "agent",
+    "agent", 
     "ai",
     "gemini",
     "typescript",
     "ambisius",
     "search",
-    "information-retrieval"
+    "information-retrieval",
+    "agentic-ai"
   ],
   "author": "Ray Hawkins Kaban",
   "license": "MIT",
@@ -28,11 +36,12 @@
     "@google/generative-ai": "^0.24.1",
     "cheerio": "^1.1.2",
     "dotenv": "^16.4.5",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^2.7.0"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",
     "@types/cheerio": "^0.22.35",
+    "@types/node-fetch": "^2.6.11",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2"
   },

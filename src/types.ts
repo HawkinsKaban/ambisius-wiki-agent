@@ -30,7 +30,7 @@ export interface WikiAgentConfig {
   baseUrl: string;
   searchEndpoint: string;
   maxResults: number;
-  timeout: number;
+  timeout: number; // in milliseconds
 }
 
 export type QueryComplexity = 'simple' | 'comparison' | 'report' | 'complex_analysis';
