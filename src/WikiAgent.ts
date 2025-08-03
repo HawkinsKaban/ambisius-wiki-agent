@@ -113,7 +113,9 @@ export class WikiAgent {
    * Analyze user query to understand intent and complexity
    */
   private async analyzeQuery(query: string): Promise<ProcessedQuery> {
-    const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const model = this.genAI.getGenerativeModel({ 
+      model: 'gemini-1.5-flash-latest' 
+    });
     
     const prompt = `
 Analyze this Indonesian query and extract key information:
@@ -585,7 +587,7 @@ ${context.map(c => `
   }
 
   private createReportPrompt(query: ProcessedQuery, context: any[]): string {
-    return `
+  return `
 Buat laporan yang komprehensif untuk permintaan berikut:
 
 **Permintaan:** ${query.originalQuery}
@@ -602,34 +604,39 @@ ${context.map(c => `
 **Instruksi:**
 1. Buat laporan yang terstruktur dengan heading yang jelas
 2. Fokus pada aspek "sejarah" sesuai permintaan
-3. Jika ada topik yang tidak ditemukan informasinya, nyatakan dengan jelas
+3. **WAJIB: Jika ada topik yang tidak ditemukan informasinya, buat section khusus dan nyatakan dengan jelas bahwa informasi tidak tersedia**
 4. Gunakan format laporan formal
+5. Sebutkan secara explicit topik mana yang ditemukan dan mana yang tidak
 
 **Format laporan:**
 
-# Laporan Sejarah [Topik]
+# Laporan Sejarah [Daftar Topik]
 
 ## Ringkasan Eksekutif
-[Ringkasan singkat laporan]
+[Ringkasan singkat laporan - sebutkan topik yang berhasil ditemukan dan yang tidak]
 
-## [Topik 1]
+## [Topik 1 - DITEMUKAN]
 ### Sejarah
 [Detail sejarah topik 1]
 
-## [Topik 2]  
+## [Topik 2 - DITEMUKAN]  
 ### Sejarah
 [Detail sejarah topik 2]
 
-## [Topik yang tidak ditemukan]
-Informasi tentang [topik] tidak ditemukan di Ambisius Wiki.
+## [Topik yang TIDAK DITEMUKAN]
+**INFORMASI TIDAK TERSEDIA:** Informasi tentang [topik] tidak ditemukan di Ambisius Wiki. Hal ini mungkin karena:
+- Topik tersebut tidak ada dalam database wiki
+- Nama yang dicari mungkin tidak sesuai dengan yang tersedia
+- Informasi belum dimasukkan ke dalam sistem
 
 ## Kesimpulan
-[Kesimpulan dari laporan]
+[Kesimpulan dari laporan - sebutkan lagi apa yang berhasil dan tidak berhasil ditemukan]
 
 ## Sumber Referensi
 - [daftar sumber yang digunakan]
+- **Catatan:** Beberapa topik tidak memiliki sumber karena informasi tidak ditemukan
 `;
-  }
+}
 
   private createComplexAnalysisPrompt(query: ProcessedQuery, context: any[]): string {
     return `
