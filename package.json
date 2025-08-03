@@ -8,8 +8,9 @@
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
     "test": "ts-node src/test.ts",
-    "lint": "eslint src/**/*.ts",
-    "format": "prettier --write src/**/*.ts"
+    "test:single": "ts-node src/index.ts",
+    "clean": "rm -rf dist",
+    "prepare": "npm run build"
   },
   "keywords": [
     "wiki",
@@ -17,21 +18,33 @@
     "ai",
     "gemini",
     "typescript",
-    "ambisius"
+    "ambisius",
+    "search",
+    "information-retrieval"
   ],
   "author": "Ray Hawkins Kaban",
   "license": "MIT",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "cheerio": "^1.1.2",
+    "dotenv": "^16.4.5",
     "node-fetch": "^3.3.2"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",
+    "@types/cheerio": "^0.22.35",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2"
   },
-    "engines": {
+  "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HawkinsKaban/ambisius-wiki-agent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/HawkinsKaban/ambisius-wiki-agent/issues"
+  },
+  "homepage": "https://github.com/HawkinsKaban/ambisius-wiki-agent#readme"
 }
